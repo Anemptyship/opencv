@@ -969,53 +969,75 @@ void cv::reduce(InputArray _src, OutputArray _dst, int dim, int op, int dtype)
 namespace cv
 {
 
+template<typename T> class Sort_Invoker : public ParallelLoopBody
+{
+public:
+    Sort_Invoker( const Mat& _src, Mat& _dst, int _flags )
+        : src(_src), dst(_dst), flags(_flags)
+    {
+        sortRows = (flags & 1) == SORT_EVERY_ROW;
+        sortDescending = (flags & SORT_DESCENDING) != 0;
+        inplace = src.data == dst.data;
+        if( sortRows )
+            len = src.cols;
+        else
+            len = src.rows;
+    }
+
+    void operator()(const Range& range) const CV_OVERRIDE
+    {
+        AutoBuffer<T> buf;
+        if( !sortRows )
+            buf.allocate(len);
+        T* bptr = buf.data();
+
+        for( int i = range.start; i < range.end; i++ )
+        {
+            T* ptr = bptr;
+            if( sortRows )
+            {
+                T* dptr = dst.ptr<T>(i);
+                if( !inplace )
+                {
+                    const T* sptr = src.ptr<T>(i);
+                    memcpy(dptr, sptr, sizeof(T) * len);
+                }
+                ptr = dptr;
+            }
+            else
+            {
+                for( int j = 0; j < len; j++ )
+                    ptr[j] = src.ptr<T>(j)[i];
+            }
+
+            std::sort( ptr, ptr + len );
+            if( sortDescending )
+            {
+                for( int j = 0; j < len/2; j++ )
+                    std::swap(ptr[j], ptr[len-1-j]);
+            }
+
+            if( !sortRows )
+                for( int j = 0; j < len; j++ )
+                    dst.ptr<T>(j)[i] = ptr[j];
+        }
+    }
+
+private:
+    const Mat& src;
+    Mat& dst;
+    int flags;
+    bool sortRows;
+    bool sortDescending;
+    bool inplace;
+    int len;
+};
+
 template<typename T> static void sort_( const Mat& src, Mat& dst, int flags )
 {
-    AutoBuffer<T> buf;
-    int n, len;
-    bool sortRows = (flags & 1) == SORT_EVERY_ROW;
-    bool inplace = src.data == dst.data;
-    bool sortDescending = (flags & SORT_DESCENDING) != 0;
-
-    if( sortRows )
-        n = src.rows, len = src.cols;
-    else
-    {
-        n = src.cols, len = src.rows;
-        buf.allocate(len);
-    }
-    T* bptr = buf.data();
-
-    for( int i = 0; i < n; i++ )
-    {
-        T* ptr = bptr;
-        if( sortRows )
-        {
-            T* dptr = dst.ptr<T>(i);
-            if( !inplace )
-            {
-                const T* sptr = src.ptr<T>(i);
-                memcpy(dptr, sptr, sizeof(T) * len);
-            }
-            ptr = dptr;
-        }
-        else
-        {
-            for( int j = 0; j < len; j++ )
-                ptr[j] = src.ptr<T>(j)[i];
-        }
-
-        std::sort( ptr, ptr + len );
-        if( sortDescending )
-        {
-            for( int j = 0; j < len/2; j++ )
-                std::swap(ptr[j], ptr[len-1-j]);
-        }
-
-        if( !sortRows )
-            for( int j = 0; j < len; j++ )
-                dst.ptr<T>(j)[i] = ptr[j];
-    }
+    int n = (flags & 1) == SORT_EVERY_ROW ? src.rows : src.cols;
+    Sort_Invoker<T> body(src, dst, flags);
+    parallel_for_(Range(0, n), body, n);
 }
 
 #ifdef HAVE_IPP
@@ -1114,56 +1136,78 @@ public:
     const _Tp* arr;
 };
 
+template<typename T> class SortIdx_Invoker : public ParallelLoopBody
+{
+public:
+    SortIdx_Invoker( const Mat& _src, Mat& _dst, int _flags )
+        : src(_src), dst(_dst), flags(_flags)
+    {
+        sortRows = (flags & 1) == SORT_EVERY_ROW;
+        sortDescending = (flags & SORT_DESCENDING) != 0;
+        
+        if( sortRows )
+            len = src.cols;
+        else
+            len = src.rows;
+    }
+
+    void operator()(const Range& range) const CV_OVERRIDE
+    {
+        AutoBuffer<T> buf;
+        AutoBuffer<int> ibuf;
+        if( !sortRows )
+        {
+            buf.allocate(len);
+            ibuf.allocate(len);
+        }
+        T* bptr = buf.data();
+        int* _iptr = ibuf.data();
+
+        for( int i = range.start; i < range.end; i++ )
+        {
+            T* ptr = bptr;
+            int* iptr = _iptr;
+
+            if( sortRows )
+            {
+                ptr = (T*)(src.data + src.step*i);
+                iptr = dst.ptr<int>(i);
+            }
+            else
+            {
+                for( int j = 0; j < len; j++ )
+                    ptr[j] = src.ptr<T>(j)[i];
+            }
+            for( int j = 0; j < len; j++ )
+                iptr[j] = j;
+
+            std::sort( iptr, iptr + len, LessThanIdx<T>(ptr) );
+            if( sortDescending )
+            {
+                for( int j = 0; j < len/2; j++ )
+                    std::swap(iptr[j], iptr[len-1-j]);
+            }
+
+            if( !sortRows )
+                for( int j = 0; j < len; j++ )
+                    dst.ptr<int>(j)[i] = iptr[j];
+        }
+    }
+
+private:
+    const Mat& src;
+    Mat& dst;
+    int flags;
+    bool sortRows;
+    bool sortDescending;
+    int len;
+};
+
 template<typename T> static void sortIdx_( const Mat& src, Mat& dst, int flags )
 {
-    AutoBuffer<T> buf;
-    AutoBuffer<int> ibuf;
-    bool sortRows = (flags & 1) == SORT_EVERY_ROW;
-    bool sortDescending = (flags & SORT_DESCENDING) != 0;
-
-    CV_Assert( src.data != dst.data );
-
-    int n, len;
-    if( sortRows )
-        n = src.rows, len = src.cols;
-    else
-    {
-        n = src.cols, len = src.rows;
-        buf.allocate(len);
-        ibuf.allocate(len);
-    }
-    T* bptr = buf.data();
-    int* _iptr = ibuf.data();
-
-    for( int i = 0; i < n; i++ )
-    {
-        T* ptr = bptr;
-        int* iptr = _iptr;
-
-        if( sortRows )
-        {
-            ptr = (T*)(src.data + src.step*i);
-            iptr = dst.ptr<int>(i);
-        }
-        else
-        {
-            for( int j = 0; j < len; j++ )
-                ptr[j] = src.ptr<T>(j)[i];
-        }
-        for( int j = 0; j < len; j++ )
-            iptr[j] = j;
-
-        std::sort( iptr, iptr + len, LessThanIdx<T>(ptr) );
-        if( sortDescending )
-        {
-            for( int j = 0; j < len/2; j++ )
-                std::swap(iptr[j], iptr[len-1-j]);
-        }
-
-        if( !sortRows )
-            for( int j = 0; j < len; j++ )
-                dst.ptr<int>(j)[i] = iptr[j];
-    }
+    int n = (flags & 1) == SORT_EVERY_ROW ? src.rows : src.cols;
+    SortIdx_Invoker<T> body(src, dst, flags);
+    parallel_for_(Range(0, n), body, n);
 }
 
 #ifdef HAVE_IPP
