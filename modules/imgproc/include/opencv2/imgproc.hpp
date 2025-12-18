@@ -1940,6 +1940,62 @@ CV_EXPORTS_W void Canny( InputArray dx, InputArray dy,
                          double threshold1, double threshold2,
                          bool L2gradient = false );
 
+/** @brief Detects edges using Phase Congruency method.
+
+The function detects edges in an image using Phase Congruency, which is mathematically elegant
+and robust to illumination changes and noise. Phase Congruency measures the consistency of phase
+across multiple scales and orientations, making it particularly effective for detecting edges
+that are invariant to brightness changes.
+
+The algorithm works by:
+1. Creating a bank of Gabor filters at multiple scales and orientations
+2. Convolving the image with each filter to extract phase and amplitude information
+3. Computing phase congruency at each pixel location
+4. Thresholding the phase congruency map to produce edge pixels
+
+@param src Input single-channel 8-bit or floating-point image.
+@param dst Output edge map; single-channel 8-bit image, which has the same size as src.
+@param numScales Number of scales for Gabor filter bank. More scales provide better edge
+       detection but increase computation time. Typical values: 3-6. Default: 4.
+@param numOrientations Number of orientations for Gabor filter bank. More orientations provide
+       better directional edge detection. Typical values: 4-8. Default: 6.
+@param threshold Threshold for edge detection in the range [0, 1]. Higher values produce
+       fewer but stronger edges. Default: 0.1.
+@param noiseThreshold Noise threshold T in the phase congruency formula. This helps suppress
+       noise in uniform regions. Typical values: 0.01-0.1. Default: 0.01.
+@param k Noise compensation factor. Higher values provide better noise suppression but may
+       suppress weak edges. Typical values: 1.0-3.0. Default: 2.0.
+@param sigma Standard deviation of Gaussian envelope in Gabor filters, relative to wavelength.
+       Typical values: 0.4-0.6. Default: 0.5.
+@param minWaveLength Minimum wavelength in pixels for the smallest scale filter.
+       Should be at least 3. Default: 3.0.
+@param mult Multiplicative factor between successive scales. Typical values: 2.0-2.5. Default: 2.1.
+@param orientationEdges Optional output for orientation of edges in radians (CV_32FC1).
+       If provided, stores the dominant edge orientation at each edge pixel.
+
+@note This method is based on the work of Kovesi (1999, 2003) on Phase Congruency.
+      It is particularly useful for:
+      - Detecting edges in images with varying illumination
+      - Preserving thin edges
+      - Suppressing noise while maintaining edge information
+      - Applications requiring illumination-invariant edge detection
+
+@sa Canny, Sobel, Scharr
+ */
+CV_EXPORTS_W void phaseCongruencyEdges(
+    InputArray src,
+    OutputArray dst,
+    int numScales = 4,
+    int numOrientations = 6,
+    double threshold = 0.1,
+    double noiseThreshold = 0.01,
+    double k = 2.0,
+    double sigma = 0.5,
+    double minWaveLength = 3.0,
+    double mult = 2.1,
+    OutputArray orientationEdges = noArray()
+);
+
 /** @brief Calculates the minimal eigenvalue of gradient matrices for corner detection.
 
 The function is similar to cornerEigenValsAndVecs but it calculates and stores only the minimal
