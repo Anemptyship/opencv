@@ -446,9 +446,9 @@ enum ContourApproximationModes {
     /** compresses horizontal, vertical, and diagonal segments and leaves only their end points.
     For example, an up-right rectangular contour is encoded with 4 points. */
     CHAIN_APPROX_SIMPLE    = 2,
-    /** applies one of the flavors of the Teh-Chin chain approximation algorithm @cite TehChin89 */
+    /** Teh-Chin chain approximation algorithm (L1 metric) @cite TehChin89 */
     CHAIN_APPROX_TC89_L1   = 3,
-    /** applies one of the flavors of the Teh-Chin chain approximation algorithm @cite TehChin89 */
+    /** Teh-Chin chain approximation algorithm (k-cosine) @cite TehChin89 */
     CHAIN_APPROX_TC89_KCOS = 4
 };
 
