@@ -44,7 +44,7 @@ public:
             CV_Assert(params.has("zoom_factor_x") && params.has("zoom_factor_y"));
         }
         interpolation = params.get<String>("interpolation");
-        CV_Check(interpolation, interpolation == "nearest" || interpolation == "opencv_linear" || interpolation == "bilinear", "");
+        CV_Check(interpolation, interpolation == "nearest" || interpolation == "opencv_linear" || interpolation == "bilinear" || interpolation == "cubic" || interpolation == "lanczos4", "");
 
         alignCorners = params.get<bool>("align_corners", false);
         halfPixelCenters = params.get<bool>("half_pixel_centers", false);
@@ -240,10 +240,12 @@ public:
         }
 
         if ((interpolation == "nearest" && !alignCorners && !halfPixelCenters) || (interpolation == "opencv_linear" && depth != CV_8S) ||
-            (interpolation == "bilinear" && halfPixelCenters && depth != CV_8S))
+            ((interpolation == "bilinear" || interpolation == "cubic" || interpolation == "lanczos4") && halfPixelCenters && depth != CV_8S))
         {
             // INTER_LINEAR Resize mode does not support INT8 inputs
-            InterpolationFlags mode = interpolation == "nearest" ? INTER_NEAREST : INTER_LINEAR;
+            InterpolationFlags mode = interpolation == "nearest" ? INTER_NEAREST :
+                                      interpolation == "cubic" ? INTER_CUBIC :
+                                      interpolation == "lanczos4" ? INTER_LANCZOS4 : INTER_LINEAR;
             // [TODO] this is a really slow approach; need to rewrite it completely.
             // Rewritten with parallel_for_ to improve performance significantly.
             size_t nbatch = inputs[0].size[0];

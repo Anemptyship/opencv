@@ -25,7 +25,7 @@ struct Layer_Resize : public TestBaseWithParam<tuple<Backend, Target>>
         lp.set("height", outH);
         
         // Force specific paths to hit the "slow" loop
-        if (interp == "bilinear") {
+        if (interp == "bilinear" || interp == "cubic" || interp == "lanczos4") {
              lp.set("half_pixel_centers", true);
         }
 
@@ -53,7 +53,6 @@ struct Layer_Resize : public TestBaseWithParam<tuple<Backend, Target>>
 PERF_TEST_P_(Layer_Resize, Resize_Upsample_Linear)
 {
     // N=4, C=64, H=64, W=64 -> 128x128 (x2 upsample)
-    // Common in segmentation/detection heads
     test_layer({4, 64, 64, 64}, 128, 128, "opencv_linear");
 }
 
@@ -61,6 +60,24 @@ PERF_TEST_P_(Layer_Resize, Resize_Downsample_Nearest)
 {
     // N=4, C=128, H=128, W=128 -> 64x64 (x0.5 downsample)
     test_layer({4, 128, 128, 128}, 64, 64, "nearest");
+}
+
+PERF_TEST_P_(Layer_Resize, Resize_Upsample_Cubic)
+{
+    // High-quality upsampling
+    test_layer({4, 64, 64, 64}, 128, 128, "cubic");
+}
+
+PERF_TEST_P_(Layer_Resize, Resize_Upsample_Nearest)
+{
+    // Fastest upsampling
+    test_layer({4, 64, 64, 64}, 128, 128, "nearest");
+}
+
+PERF_TEST_P_(Layer_Resize, Resize_Downsample_Lanczos4)
+{
+    // High-quality downsampling
+    test_layer({4, 128, 128, 128}, 64, 64, "lanczos4");
 }
 
 INSTANTIATE_TEST_CASE_P(/**/, Layer_Resize, dnnBackendsAndTargets(false, false, true, false, false, false, false, false));
