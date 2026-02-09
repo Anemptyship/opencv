@@ -436,21 +436,27 @@ public:
         }
         else
         {
-            const T *srcData = inp.ptr<T>();
-            T *dstData = out.ptr<T>();
+            int nstripes = getNumThreads();
+            parallel_for_(Range(0, nstripes), [&](const Range& r) {
+                size_t start = r.start * _count / nstripes;
+                size_t end = std::min(r.end * _count / nstripes, _count);
 
-            for (size_t i = 0; i < _count; ++i)
-            {
-                size_t oldPosition = 0;
-                size_t newPosition = i;
+                const T *srcData = inp.ptr<T>();
+                T *dstData = out.ptr<T>();
 
-                for (size_t j = 0; j < _numAxes; ++j)
+                for (size_t i = start; i < end; ++i)
                 {
-                    oldPosition += (newPosition / newStride[j]) * oldStride[order[j]];
-                    newPosition %= newStride[j];
+                    size_t oldPosition = 0;
+                    size_t newPosition = i;
+
+                    for (size_t j = 0; j < _numAxes; ++j)
+                    {
+                        oldPosition += (newPosition / newStride[j]) * oldStride[order[j]];
+                        newPosition %= newStride[j];
+                    }
+                    dstData[i] = srcData[oldPosition];
                 }
-                dstData[i] = srcData[oldPosition];
-            }
+            }, nstripes);
         }
     }
 

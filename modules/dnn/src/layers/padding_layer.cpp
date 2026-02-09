@@ -167,16 +167,23 @@ public:
             CV_CheckLE(padTop, inpHeight, ""); CV_CheckLE(padBottom, inpHeight, "");
             CV_CheckLE(padLeft, inpWidth, ""); CV_CheckLE(padRight, inpWidth, "");
 
-            for (size_t n = 0; n < inputs[0].size[0]; ++n)
-            {
-                for (size_t ch = 0; ch < inputs[0].size[1]; ++ch)
+            int nstripes = getNumThreads();
+            parallel_for_(Range(0, nstripes), [&](const Range& r) {
+                int total = inputs[0].size[0] * inputs[0].size[1];
+                int stripeSize = (total + nstripes - 1) / nstripes;
+                int start = r.start * stripeSize;
+                int end = std::min(r.end * stripeSize, total);
+
+                for (int i = start; i < end; ++i)
                 {
+                    int n = i / inputs[0].size[1];
+                    int ch = i % inputs[0].size[1];
                     copyMakeBorder(getPlane(inputs[0], n, ch),
                                    getPlane(outputs[0], n, ch),
                                    padTop, padBottom, padLeft, padRight,
                                    borderType);
                 }
-            }
+            }, nstripes);
         }
         else
             CV_Error(Error::StsNotImplemented, "Unknown padding type: " + paddingType);
