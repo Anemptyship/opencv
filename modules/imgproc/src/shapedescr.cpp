@@ -182,35 +182,27 @@ void cv::minEnclosingCircle( InputArray _points, Point2f& _center, float& _radiu
         return;
     }
 
+
+    RNG& rng = theRNG();
+
+
     if (is_float)
     {
-        findMinEnclosingCircle<Point2f>(ptsf, count, _center, _radius);
-        #if 0
-            for (int m = 0; m < count; ++m)
-            {
-                float d = (float)norm(ptsf[m] - _center);
-                if (d > _radius)
-                {
-                    printf("error!\n");
-                }
-            }
-        #endif
+        AutoBuffer<Point2f> buf(count);
+        Point2f* pts = buf.data();
+        std::copy(ptsf, ptsf + count, pts);
+        for (int i = count - 1; i > 0; --i)
+            std::swap(pts[i], pts[rng.uniform(0, i + 1)]);
+        findMinEnclosingCircle<Point2f>(pts, count, _center, _radius);
     }
     else
     {
-        findMinEnclosingCircle<Point>(ptsi, count, _center, _radius);
-        #if 0
-            for (int m = 0; m < count; ++m)
-            {
-                double dx = ptsi[m].x - _center.x;
-                double dy = ptsi[m].y - _center.y;
-                double d = std::sqrt(dx * dx + dy * dy);
-                if (d > _radius)
-                {
-                    printf("error!\n");
-                }
-            }
-        #endif
+        AutoBuffer<Point> buf(count);
+        Point* pts = buf.data();
+        std::copy(ptsi, ptsi + count, pts);
+        for (int i = count - 1; i > 0; --i)
+            std::swap(pts[i], pts[rng.uniform(0, i + 1)]);
+        findMinEnclosingCircle<Point>(pts, count, _center, _radius);
     }
 }
 

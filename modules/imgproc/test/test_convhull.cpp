@@ -1136,6 +1136,24 @@ TEST(minEnclosingCircle, three_points)
     EXPECT_LE(delta, 1.f);
 }
 
+TEST(minEnclosingCircle, sorted_input)
+{
+    const int N = 5000;
+    std::vector<Point2f> pts(N);
+    for (int i = 0; i < N; i++)
+    {
+        double angle = 2.0 * CV_PI * i / N;
+        pts[i] = Point2f(500.f * (float)cos(angle), 500.f * (float)sin(angle));
+    }
+
+    Point2f center;
+    float radius;
+    minEnclosingCircle(pts, center, radius);
+
+    EXPECT_NEAR(center.x, 0.f, 1.f);
+    EXPECT_NEAR(center.y, 0.f, 1.f);
+    EXPECT_NEAR(radius, 500.f, 1.f);
+}
 
 //============================ minEnclosingPolygon tests ============================
 
