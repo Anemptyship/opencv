@@ -19,8 +19,9 @@ int solve_deg2(double a, double b, double c, double & x1, double & x2)
   }
 
   double sqrt_delta = sqrt(delta);
-  x1 = (-b + sqrt_delta) * inv_2a;
-  x2 = (-b - sqrt_delta) * inv_2a;
+  double q = -0.5 * (b + copysign(sqrt_delta, b));
+  x1 = q / a;
+  x2 = c / q;
   return 2;
 }
 
